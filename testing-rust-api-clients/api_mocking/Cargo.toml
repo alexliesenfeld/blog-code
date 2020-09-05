@@ -1,0 +1,15 @@
+[package]
+name = "api_mocking"
+version = "0.1.0"
+authors = ["Alexander Liesenfeld <alexander.liesenfeld@outlook.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+isahc = { version = "0.9.8", features = ["json"] }
+serde_json = "1.0"
+custom_error = "1.7.1"
+
+[dev-dependencies]
+httpmock = "0.4"
