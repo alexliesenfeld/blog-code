@@ -65,6 +65,8 @@ mod tests {
 
     #[test]
     fn create_repo_success_test() {
+        let _ = env_logger::try_init();
+
         // Arrange
         let mock_server = MockServer::start();
         let mock = Mock::new()
@@ -88,3 +90,4 @@ mod tests {
         assert_eq!(mock.times_called(), 1);
     }
 }
+
