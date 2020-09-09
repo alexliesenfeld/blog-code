@@ -2,13 +2,13 @@ use custom_error::custom_error;
 use isahc::prelude::Request;
 use serde_json::{json, Value};
 use isahc::{RequestExt, ResponseExt};
-use crate::GithubError::{MissingValueError, UnexpectedResponseCode};
+use crate::GithubError::{MissingValueError, UnexpectedResponseCodeError};
 
 custom_error! {pub GithubError
     HttpError{source: isahc::http::Error} = "HTTP error",
     HttpClientError{source: isahc::Error} = "HTTP client error",
     ParserError{source: serde_json::Error} = "JSON parser error",
-    UnexpectedResponseCode{code: u16} = "Unexpected HTTP response code: {code}",
+    UnexpectedResponseCodeError{code: u16} = "Unexpected HTTP response code: {code}",
     MissingValueError{field: &'static str} = "Missing field in HTTP response: {field}",
 }
 
@@ -38,7 +38,7 @@ impl GithubAPIAdapter {
             .send()?;
 
         if response.status() != 201 {
-            return Err(UnexpectedResponseCode { code: response.status().as_u16() });
+            return Err(UnexpectedResponseCodeError { code: response.status().as_u16() });
         }
 
         let json_body: Value = response.json()?;
