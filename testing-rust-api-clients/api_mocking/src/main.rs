@@ -1,8 +1,8 @@
+use crate::GithubError::{MissingValueError, UnexpectedResponseCodeError};
 use custom_error::custom_error;
 use isahc::prelude::Request;
-use serde_json::{json, Value};
 use isahc::{RequestExt, ResponseExt};
-use crate::GithubError::{MissingValueError, UnexpectedResponseCodeError};
+use serde_json::Value;cd
 
 custom_error! {pub GithubError
     HttpError{source: isahc::http::Error} = "HTTP error",
@@ -12,17 +12,14 @@ custom_error! {pub GithubError
     MissingValueError{field: &'static str} = "Missing field in HTTP response: {field}",
 }
 
-pub struct GithubAPIAdapter {
+pub struct GithubAPIClient {
     base_url: String,
     token: String,
 }
 
-impl GithubAPIAdapter {
-    pub fn new(token: String, base_url: String) -> GithubAPIAdapter {
-        GithubAPIAdapter {
-            base_url,
-            token,
-        }
+impl GithubAPIClient {
+    pub fn new(token: String, base_url: String) -> GithubAPIClient {
+        GithubAPIClient { base_url, token }
     }
 
     /// This method implements
@@ -31,10 +28,13 @@ impl GithubAPIAdapter {
         let mut response = Request::post(format!("{}/user/repos", self.base_url))
             .header("Authorization", format!("token {}", self.token))
             .header("Content-Type", "application/json")
-            .body(json!({
+            .body(
+                json!({
                     "name": name,
                     "private": private
-                }).to_string())?
+                })
+                    .to_string(),
+            )?
             .send()?;
 
         if response.status() != 201 {
@@ -44,13 +44,13 @@ impl GithubAPIAdapter {
         let json_body: Value = response.json()?;
         return match json_body["html_url"].as_str() {
             Some(url) => Ok(url.into()),
-            None => Err(MissingValueError{field: "html_url"})
-        }
+            None => Err(MissingValueError { field: "html_url" }),
+        };
     }
 }
 
 fn main() {
-    let github = GithubAPIAdapter::new("<github-token>".into(), "https://api.github.com".into());
+    let github = GithubAPIClient::new("<github-token>".into(), "https://api.github.com".into());
     let url = github
         .create_repo("apprepo", true)
         .expect("Cannot create repo");
@@ -59,9 +59,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use crate::GithubAPIAdapter;
-    use httpmock::{MockServer, Mock, Method::POST};
-    use serde_json::{json};
+    use crate::GithubAPIClient;
+    use httpmock::{MockServer};
+    use serde_json::json;
 
     #[test]
     fn create_repo_success_test() {
@@ -69,25 +69,24 @@ mod tests {
 
         // Arrange
         let mock_server = MockServer::start();
-        let mock = Mock::new()
-            .expect_method(POST)
-            .expect_path("/user/repos")
-            .expect_header("Authorization", "token TOKEN")
-            .expect_header("Content-Type", "application/json")
-            .return_status(201)
-            .return_body(&json!({ "html_url": "http://example.com" }).to_string())
-            .create_on(&mock_server);
 
-        let adapter = GithubAPIAdapter::new("TOKEN".into(), format!("http://{}", &mock_server.address()));
+        let mock = mock_server.mock(|when, then| {
+            when.method("POST")
+                .path("/user/repos")
+                .header("Authorization", "token TOKEN")
+                .header("Content-Type", "application/json");
+            then.status(201)
+                .json_body(json!({ "html_url": "http://example.com" }));
+        });
+
+        let github_client = GithubAPIClient::new("TOKEN".into(), mock_server.base_url());
 
         // Act
-        let result = adapter
-            .create_repo("testrepo", true)
-            .expect("Request not successful");
+        let result = github_client.create_repo("testrepo", true);
 
         // Assert
-        assert_eq!(result, "http://example.com");
-        assert_eq!(mock.times_called(), 1);
+        mock.assert();
+        assert_eq!(result.is_ok(), true);
+        assert_eq!(result.unwrap(), "http://example.com");
     }
 }
-
